@@ -1,231 +1,217 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { FiDollarSign, FiMapPin } from "react-icons/fi";
 
 const MyJobs = () => {
-  // State variables
-  const [jobs, setJobs] = useState([]); // State to hold all jobs fetched from the server
-  const [filteredJobs, setFilteredJobs] = useState([]); // State to hold jobs filtered based on search text
-  const [searchText, setSearchText] = useState(''); // State to hold the current search text input value
-  const [isLoading, setIsLoading] = useState(true); // State to indicate if data is being loaded
-  const [isDeleting, setIsDeleting] = useState(false); // State to indicate if a delete operation is in progress
-  const [currentPage, setCurrentPage] = useState(1); // State to track the current page
-  const itemsPerPage = 4; // Number of jobs to display per page
+  const [applications, setApplications] = useState([]);
+  const [jobDetails, setJobDetails] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 4;
 
-  // Fetch jobs from the server on component mount
-  useEffect(() => {
-    setIsLoading(true); // Set loading state to true
-    fetch(`http://localhost:3000/myJobs/projects.beastwolfxd@gmail.com`)
-      .then((res) => res.json())
-      .then((data) => {
-        setJobs(data); // Set fetched jobs to the state
-        setIsLoading(false); // Set loading state to false after fetching
-      })
-      .catch((error) => {
-        console.error('Error fetching jobs:', error);
-        setIsLoading(false); // Set loading state to false on error
-      });
-  }, []);
+  // Replace with actual user ID from auth
+  const userId = "iy444f0_wa";
 
-  // Filter jobs based on search text whenever searchText or jobs change
   useEffect(() => {
-    if (searchText.trim() === '') {
-      setFilteredJobs(jobs); // If search text is empty, display all jobs
-    } else {
-      const filtered = jobs.filter((job) =>
-        job.jobTitle.toLowerCase().includes(searchText.toLowerCase()) ||
-        job.companyName.toLowerCase().includes(searchText.toLowerCase())
-      );
-      setFilteredJobs(filtered); // Filter jobs based on job title or company name
-    }
-  }, [searchText, jobs]);
+    const fetchApplicationsAndJobs = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch applications
+        const applicationsResponse = await fetch(
+          `http://localhost:5858/v1/applications/user/`,
+        );
+        const applicationsData = await applicationsResponse.json();
+
+        if (applicationsData.success) {
+          setApplications(applicationsData.data);
+
+          // Get unique job IDs
+          const uniqueJobIds = [
+            ...new Set(applicationsData.data.map((app) => app.job_id)),
+          ];
+
+          // Fetch job details for each unique job ID
+          const jobDetailsPromises = uniqueJobIds.map((jobId) =>
+            fetch(`http://localhost:5858/v1/jobs/get/${jobId}`).then((res) =>
+              res.json(),
+            ),
+          );
+
+          const jobDetailsResults = await Promise.all(jobDetailsPromises);
+
+          // Create a map of job details
+          const jobDetailsMap = {};
+          jobDetailsResults.forEach((response, index) => {
+            if (response.success && response.data.length > 0) {
+              jobDetailsMap[uniqueJobIds[index]] = response.data[0];
+            }
+          });
+
+          setJobDetails(jobDetailsMap);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchApplicationsAndJobs();
+  }, [userId]);
 
   // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentJobs = filteredJobs.slice(indexOfFirstItem, indexOfLastItem);
+  const currentApplications = applications.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
 
-  // Next page handler
   const nextPage = () => {
-    if (indexOfLastItem < filteredJobs.length) {
+    if (indexOfLastItem < applications.length) {
       setCurrentPage(currentPage + 1);
     }
   };
 
-  // Previous page handler
   const prevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
   };
 
-  // Handle search button click
-  const handleSearch = () => {
-    if (searchText.trim() === '') {
-      setFilteredJobs(jobs); // If search text is empty, display all jobs
-    } else {
-      const filtered = jobs.filter((job) =>
-        job.jobTitle.toLowerCase().includes(searchText.toLowerCase()) ||
-        job.companyName.toLowerCase().includes(searchText.toLowerCase())
-      );
-      setFilteredJobs(filtered); // Filter jobs based on job title or company name
-    }
-  };
-
-  // Handle delete button click for a job
-  const handleDelete = (id) => {
-    setIsDeleting(true); // Set deleting state to true
-    fetch(`http://localhost:3000/job/${id}`, {
-      method: 'DELETE',
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.acknowledged === true) {
-          // Job deleted successfully, update the jobs state
-          const updatedJobs = jobs.filter((job) => job._id !== id);
-          setJobs(updatedJobs); // Update jobs state
-          setFilteredJobs(updatedJobs); // Update filtered jobs as well
-          alert('Job Deleted Successfully!!!'); // Show success message
-        }
-      })
-      .catch((error) => {
-        console.error('Error deleting job:', error); // Log error if delete operation fails
-      })
-      .finally(() => {
-        setIsDeleting(false); // Reset deleting state
-      });
-  };
-
   return (
-    <div className='max-w-screen-2xl container mx-auto xl:px-24 px-4'>
-      <div className='my-jobs-container'>
-        <h1 className='text-center p-4'>All My Jobs</h1>
-        <div className='search-box p-2 text-center mb-2'>
-          <input
-            onChange={(e) => setSearchText(e.target.value)}
-            type='text'
-            name='search'
-            id='search'
-            className='py-2 pl-3 border focus:outline-none lg:w-6/12 mb-4 w-full'
-          />
-          <button
-            className='bg-blue text-white font-semibold px-8 py-2 rounded-sem mb-4'
-            onClick={handleSearch}
-          >
-            Search
-          </button>
-        </div>
+    <div className="max-w-screen-2xl container mx-auto xl:px-24 px-4">
+      <div className="my-jobs-container">
+        <h1 className="text-center p-4 text-2xl font-bold">My Applications</h1>
       </div>
 
-      {/* Table section */}
-      <section className='py-1 bg-blueGray-50'>
-        <div className='w-full xl:w-8/12 mb-12 xl:mb-0 px-4 mx-auto mt-5'>
-          <div className='relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded '>
-            <div className='rounded-t mb-0 px-4 py-3 border-0'>
-              <div className='flex flex-wrap items-center'>
-                <div className='relative w-full px-4 max-w-full flex-grow flex-1'>
-                  <h3 className='font-semibold text-base text-blueGray-700'>
-                    All Jobs
-                  </h3>
-                </div>
-                <div className='relative w-full px-4 max-w-full flex-grow flex-1 text-right'>
-                  <Link to='/post-job'>
-                    <button className='bg-indigo-500 text-white active:bg-indigo-600 text-xs font-bold uppercase px-3 py-1 rounded outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150'>
-                      Post A New Job
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div className='block w-full overflow-x-auto'>
-              <table className='items-center bg-transparent w-full border-collapse '>
+      <section className="py-1 bg-blueGray-50">
+        <div className="w-full xl:w-8/12 mb-12 xl:mb-0 px-4 mx-auto mt-5">
+          <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
+            <div className="block w-full overflow-x-auto">
+              <table className="items-center bg-transparent w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      NO
+                    <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">
+                      Job Details
                     </th>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      TITLE
+                    <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">
+                      Status
                     </th>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      COMPANY NAME
-                    </th>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      SALARY
-                    </th>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      EDIT
-                    </th>
-                    <th className='px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left'>
-                      DELETE
+                    <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">
+                      Action
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading ? ( // Display loading message while data is being fetched
+                  {isLoading ? (
                     <tr>
-                      <td colSpan='6' className='text-center py-4'>
+                      <td colSpan="3" className="text-center py-4">
                         Loading...
                       </td>
                     </tr>
-                  ) : currentJobs.length === 0 ? ( // Display message if no jobs match the filter
+                  ) : currentApplications.length === 0 ? (
                     <tr>
-                      <td colSpan='6' className='text-center py-4'>
-                        No jobs found.
+                      <td colSpan="3" className="text-center py-4">
+                        No applications found.
                       </td>
                     </tr>
                   ) : (
-                    // Map through current jobs and display each job in a table row
-                    currentJobs.map((job, index) => (
-                      <tr key={index}>
-                        <td className='border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4 text-left text-blueGray-700'>
-                          {index + 1 + indexOfFirstItem} {/* Display job index */}
-                        </td>
-                        <td className='border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4 '>
-                          {job.jobTitle} {/* Display job title */}
-                        </td>
-                        <td className='border-t-0 px-6 align-center border-l-0 border-r-0 text-xs whitespace-nowrap p-4'>
-                          {job.companyName} {/* Display company name */}
-                        </td>
-                        <td className='border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4'>
-                          ${job.minPrice}-${job.maxPrice} {/* Display salary range */}
-                        </td>
-                        <td className='border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4'>
-                          <button>
-                            <Link to={`/edit-job/${job._id}`}>Edit</Link> {/* Link to edit job */}
-                          </button>
-                        </td>
-                        <td className='border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4'>
-                          <button
-                            onClick={() => handleDelete(job._id)}
-                            className='bg-red-700 py-2 px-6 text-white rounded-sm'
-                            disabled={isDeleting} // Disable delete button while deleting
-                          >
-                            {isDeleting ? 'Deleting...' : 'Delete'} {/* Display delete text based on delete state */}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    currentApplications.map((application) => {
+                      const job = jobDetails[application.job_id];
+                      return (
+                        <tr key={application.id}>
+                          <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-sm p-4">
+                            {job ? (
+                              <div className="flex items-start space-x-4">
+                                <img
+                                  src={
+                                    job.company_logo ||
+                                    "/default-company-logo.png"
+                                  }
+                                  alt={job.company_name}
+                                  className="w-12 h-12 object-contain"
+                                />
+                                <div>
+                                  <h3 className="font-semibold">
+                                    {job.job_title}
+                                  </h3>
+                                  <p className="text-gray-600">
+                                    {job.company_name}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                                    {job.job_location && (
+                                      <span className="flex items-center gap-1">
+                                        <FiMapPin className="text-blue-500" />
+                                        {job.job_location}
+                                      </span>
+                                    )}
+                                    {job.min_salary && job.max_salary && (
+                                      <span className="flex items-center gap-1">
+                                        <FiDollarSign className="text-blue-500" />
+                                        ${job.min_salary / 1000}k-$
+                                        {job.max_salary / 1000}k
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              "Loading job details..."
+                            )}
+                          </td>
+                          <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-sm p-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                application.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : application.status === "accepted"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {application.status}
+                            </span>
+                          </td>
+                          <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-sm p-4">
+                            <Link
+                              to={`/job/${application.job_id}`}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              View Details
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      
+
         {/* Pagination */}
-        <div className='flex justify-center text-black space-x-8 mb-8'>
-          {currentPage > 1 && (
-            <button className='hover:underline' onClick={prevPage}>
-              Previous
-            </button>
-          )}
-          {indexOfLastItem < filteredJobs.length && (
-            <button onClick={nextPage} className='hover:underline'>
-              Next
-            </button>
-          )}
-        </div>
+        {applications.length > itemsPerPage && (
+          <div className="flex justify-center gap-4 mb-8">
+            {currentPage > 1 && (
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={prevPage}
+              >
+                Previous
+              </button>
+            )}
+            {indexOfLastItem < applications.length && (
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={nextPage}
+              >
+                Next
+              </button>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );
